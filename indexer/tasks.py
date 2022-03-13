@@ -19,7 +19,7 @@ def update_validation_cycle():
     validation_collection = client[constants.MONGO_DATABASE]['validation_data']
     validation_collection.create_index('cycle_id')
 
-    validators = lite_client.get_validators_list(34) # TODO: set 36
+    validators = lite_client.get_validators_list(36)
 
     if not validators:
         raise Exception(f'Config is not ready')

@@ -7,6 +7,7 @@ Run `./infrastructure/scripts/build_lite_client.sh`, the built executable will b
 ### Run Validation Service
 
 - (Optional) Set variables TON_VALIDATION_HTTP_PORT and TON_VALIDATION_WEBSERVERS_WORKERS.
+- Create file `private/mongodb_password` with the only line without `\n` - password for MongoDB.
 - Build the service: `sudo docker-compose build`
 - Run `sudo docker-compose up -d`
 

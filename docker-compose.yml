@@ -1,0 +1,89 @@
+version: '3.7'
+
+services:
+  mongodb:
+    image: mongo:latest
+    volumes:
+      - db-data:/data/db
+    networks: 
+      - internal
+    ports:
+      - 27017:27017
+    restart: unless-stopped
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: user1
+      MONGO_INITDB_ROOT_PASSWORD_FILE: /run/secrets/mongodb_password
+    secrets:
+      - mongodb_password
+  rabbitmq:
+    image: rabbitmq
+    networks: 
+      - internal
+    restart: unless-stopped
+  indexer:
+    build:
+      context: .
+      dockerfile: infrastructure/indexer.Dockerfile
+      args:
+        TON_CONFIG_FILE: mainnet.json
+    environment:
+      MONGO_HOST: mongodb
+      MONGO_PORT: 27017
+      MONGO_DATABASE: validation-db
+      MONGO_USER: user1
+      MONGO_PASSWORD_FILE: /run/secrets/mongodb_password
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+    depends_on:
+      - mongodb
+      - rabbitmq
+    secrets:
+      - mongodb_password
+    restart: unless-stopped
+    networks: 
+      - internal
+  webserver:
+    build: 
+      context: .
+      dockerfile: infrastructure/webserver.Dockerfile
+    environment:
+      MONGO_HOST: mongodb
+      MONGO_PORT: 27017
+      MONGO_DATABASE: validation-db
+      MONGO_USER: user1
+      MONGO_PASSWORD_FILE: /run/secrets/mongodb_password
+    secrets:
+      - mongodb_password
+    depends_on:
+      - mongodb
+    restart: unless-stopped
+    networks:
+      - internal
+    command: -w ${TON_VALIDATION_WEBSERVERS_WORKERS:-1} --bind 0.0.0.0:8081
+  nginx:
+    build:
+      context: .
+      dockerfile: infrastructure/nginx.Dockerfile
+    ports:
+      - ${TON_VALIDATION_HTTP_PORT:-80}:80
+    volumes:
+      - ./private/ssl-data/:/etc/letsencrypt
+      - nginxdata:/etc/nginx
+    networks:
+      - internal
+    depends_on:
+      - webserver
+    restart: unless-stopped
+
+volumes:
+  db-data:
+    external: false
+  nginxdata:
+    external: false
+
+secrets:
+  mongodb_password:
+    file: private/mongodb_password
+
+networks:
+  internal:

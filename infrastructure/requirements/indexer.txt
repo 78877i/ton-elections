@@ -1,0 +1,3 @@
+celery
+pymongo
+crc16

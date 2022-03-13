@@ -22,7 +22,7 @@ def update_validation_cycle():
     validators = lite_client.get_validators_list(36)
 
     if not validators:
-        raise Exception(f'Config is not ready')
+        return 'Config 36 is not ready yet'
 
     prev_saved_config = validation_collection.find_one({
         'cycle_id': {

@@ -63,8 +63,12 @@ def _get_elections(election_id: Optional[int]=None, limit: int=1, db: Database=N
             continue
 
         for participant in election['participants_list']:
-            validation_entry = next(validator for validator in validation_cycle['cycle_info']['validators'] if participant['pubkey'] == validator['pubkey'])
-            participant['index'] = validation_entry['index']
+            try:
+                validation_entry = next(validator for validator in validation_cycle['cycle_info']['validators'] if participant['pubkey'] == validator['pubkey'])
+                validator_index = validation_entry['index']
+            except StopIteration:
+                validator_index = None
+            participant['index'] = validator_index
 
     return response
 

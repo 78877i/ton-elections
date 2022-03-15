@@ -159,9 +159,13 @@ def update_complaints():
         election_req = elections_collection.find_one({'election_id': {'$eq' : cycle_complaints[0]['election_id']}})
         if election_req:
             for complaint in cycle_complaints:
-                participant = next(participant for participant in election_req['participants_list'] if val['pubkey'] == complaint)
-                complaint['wallet_address'] = participant['wallet_address']
-
+                try:
+                    participant = next(participant for participant in election_req['participants_list'] if participant['pubkey'] == complaint['pubkey'])
+                    wallet_address = participant['wallet_address']
+                except StopIteration:
+                    wallet_address = None
+                complaint['wallet_address'] = wallet_address
+                
         complaints += cycle_complaints
     
     for complaint in complaints:

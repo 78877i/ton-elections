@@ -1,9 +1,16 @@
-from typing import Optional
+from typing import Optional, List
+from copy import deepcopy
+from collections import defaultdict
+
+
 import inject
-from loguru import logger
+
 from pymongo import MongoClient, DESCENDING
 from pymongo.database import Database
 from webserver import constants
+
+from loguru import logger
+
 
 # inject configure
 def inject_config(binder):
@@ -18,32 +25,104 @@ def inject_config(binder):
 
 inject.configure_once(inject_config)
 
+
 @inject.autoparams()
-def _get_validation_cycles(cycle_id: Optional[str], limit: int, db: Database=None):
-    if cycle_id is not None:
-        request = {'cycle_id': {'$eq': cycle_id}}
-        response = list(db.validation_data.find(request, {'_id': False}))
-    else:
-        response = list(db.validation_data.find(None, {'_id': False}).limit(limit).sort('cycle_id', DESCENDING))
+def _get_validation_cycle_ids_by_limit(limit: int, db: Database):
+    cycle_ids_pipeline = [
+        {"$sort": {'cycle_id': -1}},
+        {"$limit": limit},
+        {"$project": {"cycle_id": 1}}
+    ]
 
-    for validation_cycle in response:
-        election_id = validation_cycle['cycle_id']
-        election_req = {'election_id': {'$eq': election_id}}
-        election_data = db.elections_data.find_one(election_req)
-        if election_data is None:
-            logger.error(f"Election entry for cycle_id={election_id} not found!")
-            continue
+    cycle_ids = list(x['cycle_id'] for x in db.validation_data.aggregate(cycle_ids_pipeline))
+    return cycle_ids
 
-        for validator in validation_cycle['cycle_info']['validators']:
-            election_entry = next(participant for participant in election_data['participants_list'] if participant['pubkey'] == validator['pubkey'])
-            validator['wallet_address'] = election_entry['wallet_address']
-            validator['stake'] = election_entry['stake']
-            validator['max_factor'] = election_entry['max_factor']
-            complaints_req = {'election_id': {'$eq': election_id},
-                              'pubkey': {'$eq': validator['pubkey']}}
-            validator['complaints'] = list(db.complaints_data.find(complaints_req, {'_id': False}))
 
-    return response
+@inject.autoparams()
+def _get_validation_cycle_ids_by_wallet_address(wallet_address: Optional[str],
+                                                limit: int,
+                                                db: Database):
+
+    pubkey_pipeline = [
+        {"$unwind": "$participants_list"},
+        {"$match": {"participants_list.wallet_address": wallet_address}},
+        {"$group": {"_id": wallet_address, "pubkey": {"$addToSet": "$participants_list.pubkey"}}},
+    ]
+    pubkey_list = list(db.elections_data.aggregate(pubkey_pipeline))[0]['pubkey']
+
+    cycle_ids_pipeline = [
+        {"$unwind":"$cycle_info.validators"},
+        {"$match": {"cycle_info.validators.pubkey": {"$in": pubkey_list}}},
+        {"$sort": {'cycle_id': -1}},
+        {"$limit": limit},
+        {"$project": {"cycle_id": 1}}
+    ]
+
+    cycle_ids = list(x['cycle_id'] for x in db.validation_data.aggregate(cycle_ids_pipeline))
+    return cycle_ids
+
+
+@inject.autoparams()
+def _get_validation_cycle_ids_by_adnl_address(adnl_addr: Optional[str],
+                                              limit: int,
+                                              db: Database):
+
+    cycle_ids_pipeline = [
+        {"$unwind":"$cycle_info.validators"},
+        {"$match": {"cycle_info.validators.adnl_addr": adnl_addr}},
+        {"$sort": {'cycle_id': -1}},
+        {"$limit": limit},
+        {"$project": {"cycle_id": 1}}
+    ]
+
+    cycle_ids = list(x['cycle_id'] for x in db.validation_data.aggregate(cycle_ids_pipeline))
+    return cycle_ids
+
+
+@inject.autoparams()
+def _get_validation_cycles(cycle_ids: List[str], db: Database=None):
+    pipeline = [
+        {"$match": {"cycle_id": {"$in": cycle_ids}}},
+        {"$lookup": {
+            "from": "elections_data",
+            "localField": "cycle_id",
+            "foreignField": "election_id",
+            "as": "election_info"
+        }},
+        {"$lookup": {
+            "from": "complaints_data",
+            "localField": "cycle_id",
+            "foreignField": "election_id",
+            "as": "complaints_list"
+        }},
+        {"$sort": {"cycle_id": -1}}
+    ]
+
+    result = list(db.validation_data.aggregate(pipeline))
+    for rec in result:
+        if not (len(rec['election_info']) == 1):
+            logger.warning(f"More than one election_info found")
+
+        complaints_dict = defaultdict(list)
+        for comp in rec.pop('complaints_list'):
+            comp.pop('_id')
+            complaints_dict[comp['pubkey']].append(comp)
+
+        elections_dict = rec.pop('election_info')[0]['participants_list']
+        elections_dict = {x['pubkey']: x for x in elections_dict}
+
+
+        for val in rec['cycle_info']['validators']:
+            elect = elections_dict[val['pubkey']]
+            if not (val['adnl_addr'] == elect['adnl_addr']):
+                logger.warning(f"Election info: adnl_addr mismatch")
+            val.update(elect)
+
+            val['complaints'] = complaints_dict[val['pubkey']]
+
+        rec.pop('_id')
+    return result
+
 
 @inject.autoparams()
 def _get_elections(election_id: Optional[int]=None, limit: int=1, db: Database=None):
@@ -71,6 +150,7 @@ def _get_elections(election_id: Optional[int]=None, limit: int=1, db: Database=N
             participant['index'] = validator_index
 
     return response
+
 
 @inject.autoparams()
 def _get_complaints(wallet_address: Optional[str]=None, adnl_address: Optional[str]=None, limit: int=1, db: Database=None):

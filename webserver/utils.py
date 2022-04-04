@@ -1,7 +1,5 @@
 from typing import Optional, List
-from copy import deepcopy
 from collections import defaultdict
-
 
 import inject
 
@@ -80,7 +78,26 @@ def _get_validation_cycle_ids_by_adnl_address(adnl_addr: Optional[str],
 
 
 @inject.autoparams()
-def _get_validation_cycles(cycle_ids: List[str], db: Database=None):
+def _get_validation_cycles(cycle_id: Optional[int]=None, 
+                           wallet_address: Optional[str]=None,
+                           adnl_address: Optional[str]=None,
+                           limit: int=1,
+                           return_participants: bool=True, 
+                           db: Database=None):
+    if cycle_id or wallet_address or adnl_address:
+        by_cycle_id, by_wallet_address, by_adnl_address = None, None, None
+        if cycle_id is not None:
+            by_cycle_id = [cycle_id]
+        if wallet_address is not None:
+            by_wallet_address = _get_validation_cycle_ids_by_wallet_address(wallet_address, limit)
+        if adnl_address is not None:
+            by_adnl_address = _get_validation_cycle_ids_by_adnl_address(adnl_address, limit)
+
+        # find intersection of arrays by_cycle_id, by_wallet_address, by_adnl_address but ignore None
+        cycle_ids = list(set.intersection(*map(set, filter(lambda x: x is not None, [by_cycle_id, by_wallet_address, by_adnl_address]))))
+    else:
+        cycle_ids = _get_validation_cycle_ids_by_limit(limit)
+
     pipeline = [
         {"$match": {"cycle_id": {"$in": cycle_ids}}},
         {"$lookup": {
@@ -111,6 +128,12 @@ def _get_validation_cycles(cycle_ids: List[str], db: Database=None):
         elections_dict = rec.pop('election_info')[0]['participants_list']
         elections_dict = {x['pubkey']: x for x in elections_dict}
 
+        if not return_participants:
+            # leave only requested participant in `validators` array
+            if wallet_address:
+                rec['cycle_info']['validators'] = filter(lambda x: x['wallet_address'] == wallet_address, rec['cycle_info']['validators'])
+            if adnl_address:
+                rec['cycle_info']['validators'] = filter(lambda x: x['adnl_address'] == adnl_address, rec['cycle_info']['validators'])
 
         for val in rec['cycle_info']['validators']:
             elect = elections_dict[val['pubkey']]
@@ -125,12 +148,21 @@ def _get_validation_cycles(cycle_ids: List[str], db: Database=None):
 
 
 @inject.autoparams()
-def _get_elections(election_id: Optional[int]=None, limit: int=1, db: Database=None):
+def _get_elections(election_id: Optional[int]=None, 
+                   wallet_address: Optional[str]=None,
+                   adnl_address: Optional[str]=None, 
+                   limit: int=1, 
+                   return_participants: bool=True, 
+                   db: Database=None):
+    request = {}
     if election_id is not None:
-        request = {'election_id': {'$eq': election_id}}
-        response = list(db.elections_data.find(request, {'_id': False}))
-    else:
-        response = list(db.elections_data.find(None, {'_id': False}).limit(limit).sort('election_id', DESCENDING))
+        request['election_id'] = {'$eq': election_id}
+    if wallet_address is not None:
+        request['participants_list.wallet_address'] = {'$eq': wallet_address}
+    if adnl_address is not None:
+        request['participants_list.adnl_addr'] = {'$eq': adnl_address}
+
+    response = list(db.elections_data.find(request, {'_id': False}).limit(limit).sort('election_id', DESCENDING))
 
     for election in response:
         election_id = election['election_id']
@@ -140,6 +172,15 @@ def _get_elections(election_id: Optional[int]=None, limit: int=1, db: Database=N
             if election['finished']:
                 logger.error(f"Validation entry for election_id={election_id} not found!")
             continue
+
+        election['total_participants'] = len(election['participants_list'])
+
+        if not return_participants:
+            # leave only requested participant in `participants_list` array
+            if wallet_address:
+                election['participants_list'] = filter(lambda x: x['wallet_address'] == wallet_address, election['participants_list'])
+            if adnl_address:
+                election['participants_list'] = filter(lambda x: x['adnl_address'] == adnl_address, election['participants_list'])
 
         for participant in election['participants_list']:
             try:
@@ -153,12 +194,18 @@ def _get_elections(election_id: Optional[int]=None, limit: int=1, db: Database=N
 
 
 @inject.autoparams()
-def _get_complaints(wallet_address: Optional[str]=None, adnl_address: Optional[str]=None, limit: int=1, db: Database=None):
+def _get_complaints(wallet_address: Optional[str]=None, 
+                    adnl_address: Optional[str]=None, 
+                    election_id: Optional[int]=None, 
+                    limit: int=1, 
+                    db: Database=None):
     request = {}
     if wallet_address is not None:
         request['wallet_address'] = {'$eq': wallet_address}
     if adnl_address is not None:
         request['adnl_addr'] = {'$eq': adnl_address}
+    if election_id is not None:
+        request['election_id'] = {'$eq': election_id}
 
     response = list(db.complaints_data.find(request, {'_id': False})
                                       .limit(limit)

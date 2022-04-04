@@ -6,11 +6,6 @@ from fastapi.responses import JSONResponse
 from fastapi.exceptions import HTTPException
 
 from webserver.utils import _get_validation_cycles, _get_elections, _get_complaints
-from webserver.utils import (
-    _get_validation_cycle_ids_by_adnl_address, 
-    _get_validation_cycle_ids_by_wallet_address, 
-    _get_validation_cycle_ids_by_limit
-)
 
 
 # FastAPI app
@@ -33,24 +28,23 @@ async def exception_handler(request, exc):
 def get_validation_cycles(cycle_id: Optional[int]=None, 
                           wallet_address: Optional[str]=None,
                           adnl_address: Optional[str]=None,
-                          limit: int=1):
-    cycle_ids = None
-    if cycle_id is not None:
-        cycle_ids = [cycle_id]
-    elif wallet_address is not None:
-        cycle_ids = _get_validation_cycle_ids_by_wallet_address(wallet_address, limit)
-    elif adnl_address is not None:
-        cycle_ids = _get_validation_cycle_ids_by_adnl_address(adnl_address, limit)
-    else:
-        cycle_ids = _get_validation_cycle_ids_by_limit(limit)
-    return _get_validation_cycles(cycle_ids)
+                          limit: int=1,
+                          return_participants: bool=True):
+    return _get_validation_cycles(cycle_id, wallet_address, adnl_address, limit, return_participants)
 
 @app.get('/getElections')
-def get_elections(election_id: Optional[int]=None, limit: int=1):
-    return _get_elections(election_id, limit)
+def get_elections(election_id: Optional[int]=None, 
+                  wallet_address: Optional[str]=None,
+                  adnl_address: Optional[str]=None, 
+                  limit: int=1, 
+                  return_participants: bool=True):
+    return _get_elections(election_id, wallet_address, adnl_address, limit, return_participants)
 
 @app.get('/getComplaints')
-def get_complaints(wallet_address: Optional[str]=None, adnl_address: Optional[str]=None, limit: int=1):
-    return _get_complaints(wallet_address, adnl_address, limit)
+def get_complaints(wallet_address: Optional[str]=None, 
+                   adnl_address: Optional[str]=None, 
+                   election_id: Optional[int]=None,
+                   limit: int=1):
+    return _get_complaints(wallet_address, adnl_address, election_id, limit)
 
 

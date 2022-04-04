@@ -134,7 +134,7 @@ def _get_validation_cycles(cycle_id: Optional[int]=None,
                 if wallet_address:
                     rec['cycle_info']['validators'] = filter(lambda x: x['wallet_address'] == wallet_address, rec['cycle_info']['validators'])
                 if adnl_address:
-                    rec['cycle_info']['validators'] = filter(lambda x: x['adnl_address'] == adnl_address, rec['cycle_info']['validators'])
+                    rec['cycle_info']['validators'] = filter(lambda x: x['adnl_addr'] == adnl_address, rec['cycle_info']['validators'])
             else:
                 rec['cycle_info']['validators'] = []
 
@@ -184,7 +184,7 @@ def _get_elections(election_id: Optional[int]=None,
                 if wallet_address:
                     election['participants_list'] = filter(lambda x: x['wallet_address'] == wallet_address, election['participants_list'])
                 if adnl_address:
-                    election['participants_list'] = filter(lambda x: x['adnl_address'] == adnl_address, election['participants_list'])
+                    election['participants_list'] = filter(lambda x: x['adnl_addr'] == adnl_address, election['participants_list'])
             else:
                 election['participants_list'] = []
 

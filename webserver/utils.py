@@ -129,11 +129,14 @@ def _get_validation_cycles(cycle_id: Optional[int]=None,
         elections_dict = {x['pubkey']: x for x in elections_dict}
 
         if not return_participants:
-            # leave only requested participant in `validators` array
-            if wallet_address:
-                rec['cycle_info']['validators'] = filter(lambda x: x['wallet_address'] == wallet_address, rec['cycle_info']['validators'])
-            if adnl_address:
-                rec['cycle_info']['validators'] = filter(lambda x: x['adnl_address'] == adnl_address, rec['cycle_info']['validators'])
+            if wallet_address or adnl_address:
+                # leave only requested participant in `validators` array
+                if wallet_address:
+                    rec['cycle_info']['validators'] = filter(lambda x: x['wallet_address'] == wallet_address, rec['cycle_info']['validators'])
+                if adnl_address:
+                    rec['cycle_info']['validators'] = filter(lambda x: x['adnl_address'] == adnl_address, rec['cycle_info']['validators'])
+            else:
+                rec['cycle_info']['validators'] = []
 
         for val in rec['cycle_info']['validators']:
             elect = elections_dict[val['pubkey']]
@@ -177,10 +180,14 @@ def _get_elections(election_id: Optional[int]=None,
 
         if not return_participants:
             # leave only requested participant in `participants_list` array
-            if wallet_address:
-                election['participants_list'] = filter(lambda x: x['wallet_address'] == wallet_address, election['participants_list'])
-            if adnl_address:
-                election['participants_list'] = filter(lambda x: x['adnl_address'] == adnl_address, election['participants_list'])
+            if wallet_address or adnl_address:
+                if wallet_address:
+                    election['participants_list'] = filter(lambda x: x['wallet_address'] == wallet_address, election['participants_list'])
+                if adnl_address:
+                    election['participants_list'] = filter(lambda x: x['adnl_address'] == adnl_address, election['participants_list'])
+            else:
+                election['participants_list'] = []
+
 
         for participant in election['participants_list']:
             try:

@@ -145,7 +145,7 @@ def _get_validation_cycles(cycle_id: Optional[int]=None,
         for val in rec['cycle_info']['validators']:
             elect = elections_dict[val['pubkey']]
             if elect == None:
-                logger.error(f'Election entry not found for validator with pubkey: {val['pubkey']}, election_id: {rec['cycle_id']}')
+                logger.error(f'Election entry not found for validator with pubkey: {val["pubkey"]}, election_id: {rec["cycle_id"]}')
                 continue
             if not (val['adnl_addr'] == elect['adnl_addr']):
                 logger.warning(f"Election info: adnl_addr mismatch")

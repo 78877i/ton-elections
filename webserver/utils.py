@@ -25,9 +25,10 @@ inject.configure_once(inject_config)
 
 
 @inject.autoparams()
-def _get_validation_cycle_ids_by_limit(limit: int, db: Database):
+def _get_validation_cycle_ids_by_limit(offset: int, limit: int, db: Database):
     cycle_ids_pipeline = [
         {"$sort": {'cycle_id': -1}},
+        {"$skip": offset},
         {"$limit": limit},
         {"$project": {"cycle_id": 1}}
     ]
@@ -38,6 +39,7 @@ def _get_validation_cycle_ids_by_limit(limit: int, db: Database):
 
 @inject.autoparams()
 def _get_validation_cycle_ids_by_wallet_address(wallet_address: Optional[str],
+                                                offset: int,
                                                 limit: int,
                                                 db: Database):
 
@@ -56,6 +58,7 @@ def _get_validation_cycle_ids_by_wallet_address(wallet_address: Optional[str],
         {"$unwind":"$cycle_info.validators"},
         {"$match": {"cycle_info.validators.pubkey": {"$in": pubkey_list}}},
         {"$sort": {'cycle_id': -1}},
+        {"$skip": offset},
         {"$limit": limit},
         {"$project": {"cycle_id": 1}}
     ]
@@ -66,6 +69,7 @@ def _get_validation_cycle_ids_by_wallet_address(wallet_address: Optional[str],
 
 @inject.autoparams()
 def _get_validation_cycle_ids_by_adnl_address(adnl_addr: Optional[str],
+                                              offset: int,
                                               limit: int,
                                               db: Database):
 
@@ -73,6 +77,7 @@ def _get_validation_cycle_ids_by_adnl_address(adnl_addr: Optional[str],
         {"$unwind":"$cycle_info.validators"},
         {"$match": {"cycle_info.validators.adnl_addr": adnl_addr}},
         {"$sort": {'cycle_id': -1}},
+        {"$skip": offset},
         {"$limit": limit},
         {"$project": {"cycle_id": 1}}
     ]
@@ -85,8 +90,9 @@ def _get_validation_cycle_ids_by_adnl_address(adnl_addr: Optional[str],
 def _get_validation_cycles(cycle_id: Optional[int]=None, 
                            wallet_address: Optional[str]=None,
                            adnl_address: Optional[str]=None,
-                           limit: int=1,
-                           return_participants: bool=True, 
+                           return_participants: bool=True,
+                           offset: int=0,
+                           limit: int=1, 
                            db: Database=None):
     if cycle_id or wallet_address or adnl_address:
         by_cycle_id, by_wallet_address, by_adnl_address = None, None, None
@@ -162,8 +168,9 @@ def _get_validation_cycles(cycle_id: Optional[int]=None,
 def _get_elections(election_id: Optional[int]=None, 
                    wallet_address: Optional[str]=None,
                    adnl_address: Optional[str]=None, 
-                   limit: int=1, 
-                   return_participants: bool=True, 
+                   return_participants: bool=True,
+                   offset: int=0,
+                   limit: int=1,
                    db: Database=None):
     request = {}
     if election_id is not None:
@@ -173,7 +180,7 @@ def _get_elections(election_id: Optional[int]=None,
     if adnl_address is not None:
         request['participants_list.adnl_addr'] = {'$eq': adnl_address}
 
-    response = list(db.elections_data.find(request, {'_id': False}).limit(limit).sort('election_id', DESCENDING))
+    response = list(db.elections_data.find(request, {'_id': False}).skip(offset).limit(limit).sort('election_id', DESCENDING))
 
     for election in response:
         election['total_participants'] = len(election['participants_list'])
@@ -210,6 +217,7 @@ def _get_elections(election_id: Optional[int]=None,
 def _get_complaints(wallet_address: Optional[str]=None, 
                     adnl_address: Optional[str]=None, 
                     election_id: Optional[int]=None, 
+                    offset: int=0,
                     limit: int=1, 
                     db: Database=None):
     request = {}
@@ -221,6 +229,7 @@ def _get_complaints(wallet_address: Optional[str]=None,
         request['election_id'] = {'$eq': election_id}
 
     response = list(db.complaints_data.find(request, {'_id': False})
+                                      .skip(offset)
                                       .limit(limit)
                                       .sort([('election_id', DESCENDING), ('created_time', DESCENDING)]))
 

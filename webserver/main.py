@@ -28,23 +28,26 @@ async def exception_handler(request, exc):
 def get_validation_cycles(cycle_id: Optional[int]=None, 
                           wallet_address: Optional[str]=None,
                           adnl_address: Optional[str]=None,
-                          limit: int=1,
-                          return_participants: bool=True):
-    return _get_validation_cycles(cycle_id, wallet_address, adnl_address, limit, return_participants)
+                          return_participants: bool=True,
+                          offset: int=0,
+                          limit: int=1):
+    return _get_validation_cycles(cycle_id, wallet_address, adnl_address, return_participants, offset, limit)
 
 @app.get('/getElections')
 def get_elections(election_id: Optional[int]=None, 
                   wallet_address: Optional[str]=None,
                   adnl_address: Optional[str]=None, 
-                  limit: int=1, 
-                  return_participants: bool=True):
-    return _get_elections(election_id, wallet_address, adnl_address, limit, return_participants)
+                  return_participants: bool=True,
+                  offset: int=0,
+                  limit: int=1):
+    return _get_elections(election_id, wallet_address, adnl_address, return_participants, offset, limit)
 
 @app.get('/getComplaints')
 def get_complaints(wallet_address: Optional[str]=None, 
                    adnl_address: Optional[str]=None, 
                    election_id: Optional[int]=None,
+                   offset: int=0,
                    limit: int=1):
-    return _get_complaints(wallet_address, adnl_address, election_id, limit)
+    return _get_complaints(wallet_address, adnl_address, election_id, offset, limit)
 
 

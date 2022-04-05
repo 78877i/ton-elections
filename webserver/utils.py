@@ -99,9 +99,9 @@ def _get_validation_cycles(cycle_id: Optional[int]=None,
         if cycle_id is not None:
             by_cycle_id = [cycle_id]
         if wallet_address is not None:
-            by_wallet_address = _get_validation_cycle_ids_by_wallet_address(wallet_address, limit)
+            by_wallet_address = _get_validation_cycle_ids_by_wallet_address(wallet_address, offset, limit)
         if adnl_address is not None:
-            by_adnl_address = _get_validation_cycle_ids_by_adnl_address(adnl_address, limit)
+            by_adnl_address = _get_validation_cycle_ids_by_adnl_address(adnl_address, offset, limit)
 
         # find intersection of arrays by_cycle_id, by_wallet_address, by_adnl_address but ignore None
         cycle_ids = list(set.intersection(*map(set, filter(lambda x: x is not None, [by_cycle_id, by_wallet_address, by_adnl_address]))))

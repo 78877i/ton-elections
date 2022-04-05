@@ -106,7 +106,7 @@ def _get_validation_cycles(cycle_id: Optional[int]=None,
         # find intersection of arrays by_cycle_id, by_wallet_address, by_adnl_address but ignore None
         cycle_ids = list(set.intersection(*map(set, filter(lambda x: x is not None, [by_cycle_id, by_wallet_address, by_adnl_address]))))
     else:
-        cycle_ids = _get_validation_cycle_ids_by_limit(limit)
+        cycle_ids = _get_validation_cycle_ids_by_limit(offset, limit)
 
     pipeline = [
         {"$match": {"cycle_id": {"$in": cycle_ids}}},

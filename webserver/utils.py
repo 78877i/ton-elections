@@ -46,7 +46,11 @@ def _get_validation_cycle_ids_by_wallet_address(wallet_address: Optional[str],
         {"$match": {"participants_list.wallet_address": wallet_address}},
         {"$group": {"_id": wallet_address, "pubkey": {"$addToSet": "$participants_list.pubkey"}}},
     ]
-    pubkey_list = list(db.elections_data.aggregate(pubkey_pipeline))[0]['pubkey']
+    pubkey_by_wallet = list(db.elections_data.aggregate(pubkey_pipeline))
+    if len(pubkey_by_wallet) == 0:
+        return []
+
+    pubkey_list = pubkey_by_wallet[0]['pubkey']
 
     cycle_ids_pipeline = [
         {"$unwind":"$cycle_info.validators"},
@@ -132,7 +136,7 @@ def _get_validation_cycles(cycle_id: Optional[int]=None,
             if wallet_address or adnl_address:
                 # leave only requested participant in `validators` array
                 if wallet_address:
-                    rec['cycle_info']['validators'] = list(filter(lambda x: x['wallet_address'] == wallet_address, rec['cycle_info']['validators']))
+                    rec['cycle_info']['validators'] = list(filter(lambda x: elections_dict[x['pubkey']]['wallet_address'] == wallet_address, rec['cycle_info']['validators']))
                 if adnl_address:
                     rec['cycle_info']['validators'] = list(filter(lambda x: x['adnl_addr'] == adnl_address, rec['cycle_info']['validators']))
             else:
@@ -140,6 +144,9 @@ def _get_validation_cycles(cycle_id: Optional[int]=None,
 
         for val in rec['cycle_info']['validators']:
             elect = elections_dict[val['pubkey']]
+            if elect == None:
+                logger.error(f'Election entry not found for validator with pubkey: {val['pubkey']}, election_id: {rec['cycle_id']}')
+                continue
             if not (val['adnl_addr'] == elect['adnl_addr']):
                 logger.warning(f"Election info: adnl_addr mismatch")
             val.update(elect)
@@ -169,14 +176,6 @@ def _get_elections(election_id: Optional[int]=None,
     response = list(db.elections_data.find(request, {'_id': False}).limit(limit).sort('election_id', DESCENDING))
 
     for election in response:
-        election_id = election['election_id']
-        validation_req = {'cycle_id': {'$eq': election_id}}
-        validation_cycle = db.validation_data.find_one(validation_req)
-        if validation_cycle is None:
-            if election['finished']:
-                logger.error(f"Validation entry for election_id={election_id} not found!")
-            continue
-
         election['total_participants'] = len(election['participants_list'])
 
         if not return_participants:
@@ -189,14 +188,20 @@ def _get_elections(election_id: Optional[int]=None,
             else:
                 election['participants_list'] = []
 
-
-        for participant in election['participants_list']:
-            try:
-                validation_entry = next(validator for validator in validation_cycle['cycle_info']['validators'] if participant['pubkey'] == validator['pubkey'])
-                validator_index = validation_entry['index']
-            except StopIteration:
-                validator_index = None
-            participant['index'] = validator_index
+        election_id = election['election_id']
+        validation_req = {'cycle_id': {'$eq': election_id}}
+        validation_cycle = db.validation_data.find_one(validation_req)
+        if validation_cycle is not None:
+            for participant in election['participants_list']:
+                try:
+                    validation_entry = next(validator for validator in validation_cycle['cycle_info']['validators'] if participant['pubkey'] == validator['pubkey'])
+                    validator_index = validation_entry['index']
+                except StopIteration:
+                    validator_index = None
+                participant['index'] = validator_index
+        else:
+            if election['finished']:
+                logger.error(f"Validation entry for election_id={election_id} not found!")
 
     return response
 

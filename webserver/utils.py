@@ -146,6 +146,7 @@ def _get_validation_cycles(cycle_id: Optional[int]=None,
 
             val['complaints'] = complaints_dict[val['pubkey']]
 
+        rec['cycle_info']['total_participants'] = rec['cycle_info'].pop('total')
         rec.pop('_id')
     return result
 

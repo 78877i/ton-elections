@@ -1,5 +1,5 @@
 #!/bin/bash
-set -e
+TVset -e
 
 MONGODB_PASSWORD=$(cat /home/toncenter/ton-elections/private/mongodb_password)
 COMMAND="exec mongodump -u user1 -p $MONGODB_PASSWORD -d validation-db --authenticationDatabase admin --archive"
